@@ -1,4 +1,5 @@
-* **LLM & Embeddings:** Google Gemini (`gemini-3.6-flash`[cite: 6])
+###Tech Stack
+* **LLM & Embeddings:** Google Gemini (`gemini-3.6-flash`)
 * **Vector Database:** Qdrant
 * **Orchestration & Workflow:** Inngest
 * **Backend:** FastAPI
