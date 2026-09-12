@@ -1,3 +1,9 @@
+* **LLM & Embeddings:** Google Gemini (`gemini-3.6-flash`[cite: 6])
+* **Vector Database:** Qdrant
+* **Orchestration & Workflow:** Inngest
+* **Backend:** FastAPI
+* **Frontend UI:** Streamlit
+
 By default, the project is configured with a hotel concierge guide located in the `docs/` folder (`docs/grand_horizon_hotel_guest_guide_en.pdf`). 
 
 To use your own document:
