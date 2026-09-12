@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+
+  backend:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - INNGEST_BASE_URL=http://inngest:8288
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      - qdrant
+
+  inngest:
+    build: .
+    command: npx inngest-cli@latest dev -u http://backend:8000/api/inngest
+    ports:
+      - "8288:8288"
+    depends_on:
+      - backend
+
+  streamlit:
+    build: .
+    command: streamlit run streamlit.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - INNGEST_BASE_URL=http://inngest:8288
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      - inngest
