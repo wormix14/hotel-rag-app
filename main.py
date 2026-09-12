@@ -86,7 +86,7 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
         "llm-answer",
         adapter=adapter,
         body={
-            "max_tokens": 1024,
+            "max_tokens": 4096,
             "temperature": 0.2,
             "messages": [
                 {"role": "system",
