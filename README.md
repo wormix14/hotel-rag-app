@@ -9,7 +9,11 @@ By default, the project is configured with a hotel concierge guide located in th
 
 To use your own document:
 1. Place your PDF file into the `docs/` folder.
-2. Open `main.py` and update the `pdf_path` variable inside the lifespan function:
+2. Open `main.py` and update the collection settings at the top of the file:
+   ```python
+   collection = "your_collection_name" 
+   source_id = "your_knowledge_base"    
+3. The in `main.py` update the `pdf_path` variable inside the lifespan function:
    ```python
    pdf_path = "docs/your_custom_document.pdf"
 
