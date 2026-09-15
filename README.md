@@ -1,21 +1,10 @@
 ###Tech Stack
-* **LLM & Embeddings:** Google Gemini (`gemini-3.6-flash`)
+* **LLM & Embeddings:** OpenAI(`gpt-4o-mini`)
 * **Vector Database:** Qdrant
 * **Orchestration & Workflow:** Inngest
 * **Backend:** FastAPI
 * **Frontend UI:** Streamlit
 
-By default, the project is configured with a hotel concierge guide located in the `docs/` folder (`docs/grand_horizon_hotel_guest_guide_en.pdf`). 
-
-To use your own document:
-1. Place your PDF file into the `docs/` folder.
-2. Open `main.py` and update the collection settings at the top of the file:
-   ```python
-   collection = "your_collection_name" 
-   source_id = "your_knowledge_base"    
-3. The in `main.py` update the `pdf_path` variable inside the lifespan function:
-   ```python
-   pdf_path = "docs/your_custom_document.pdf"
 
 ### 1. Obtain the Project
 * **Via Git:**
@@ -29,7 +18,7 @@ To use your own document:
 
 ### 2. Environment Configuration
 Create a .env file in the root directory of the project with the following variables:
-GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 INNGEST_EVENT_KEY=local_test_key
 
 ### 3. Build and Run via Docker Compose
@@ -40,3 +29,15 @@ docker compose up --build
 *Streamlit UI (Guest Assistant): http://localhost:8501
 *Inngest Dashboard (Workflow Runs & Events): http://localhost:8288
 *Qdrant Dashboard (Vector Collections): http://localhost:6333/dashboard
+
+By default, the project is configured with a hotel concierge guide located in the `docs/` folder (`docs/grand_horizon_hotel_guest_guide_en.pdf`). 
+
+To use your own document:
+1. Place your PDF file into the `docs/` folder.
+2. Open `main.py` and update the collection settings at the top of the file:
+   ```python
+   collection = "your_collection_name" 
+   source_id = "your_knowledge_base"    
+3. The in `main.py` update the `pdf_path` variable inside the lifespan function:
+   ```python
+   pdf_path = "docs/your_custom_document.pdf"
