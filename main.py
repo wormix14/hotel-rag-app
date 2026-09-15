@@ -14,12 +14,13 @@ from contextlib import asynccontextmanager
 
 load_dotenv()
 
-inngest_base = os.getenv("INNGEST_BASE_URL", "http://127.0.0.1:8288")
+inngest_base = os.getenv("INNGEST_BASE_URL", "http://inngest:8288")
 collection = "hotel_docs" #define a collection you want to use
 source_id = "hotel_knowledge_base" #create a name for source(helps to better create a uuid for elements in db)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.results = {}
     pdf_path = "docs/grand_horizon_hotel_guest_guide_en.pdf" #enter a path to the knowledge
     store = QdrantStorage(collection=collection)
 
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
     else:
         print("Storage is already loaded")
     yield
+    app.state.results.clear()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -47,46 +49,22 @@ inngest_client = inngest.Inngest(
     event_api_base_url=inngest_base
 )
 
-
-@inngest_client.create_function(
-    fn_id="RAG: Query PDF",
-    trigger=inngest.TriggerEvent(event="rag/query_pdf_ai"),
-)
-async def rag_query_pdf_ai(ctx: inngest.Context):
-    def _search(question: str, top_k: int = 5) -> RAGSearchResult:
+def _search(question: str, top_k: int = 5) -> RAGSearchResult:
         query_vec = embed_text([question])[0]
         store = QdrantStorage(collection=collection)
         found = store.search(vector_query=query_vec, top_k=top_k)
         return RAGSearchResult(contexts=found["contexts"])
 
-    question = ctx.event.data["question"]
-    top_k = int(ctx.event.data.get("top_k", 5))
-
-    found = await ctx.step.run("embed-and-search", lambda:_search(question=question, top_k=top_k), output_type=RAGSearchResult)
-
-    context_block = "\n\n".join(f"- {c}" for c in found.contexts)
-    print("--- CONTEXT ---") #for logs
-    print(context_block)
-    print("--------------------------")
-
-    user_content = (
-        "Use the following context to answer the question.\n\n"
-        f"Context:\n{context_block}\n\n"
-        f"Question: {question}\n"
-        "Answer concisely using the context above."
-    )
-
-    adapter = ai.openai.Adapter(
-        auth_key=os.getenv("GEMINI_API_KEY"),
-        model="gemini-3.6-flash",  
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-    )
-
-    res = await ctx.step.ai.infer(
-        "llm-answer",
-        adapter=adapter,
-        body={
-            "max_tokens": 4096,
+def build_inference_payload(question: str, contexts: list[str]):
+      context_block = "\n\n".join(f"- {c}" for c in contexts) 
+      user_content = (
+             "Use the following context to answer the question.\n\n"
+             f"Context:\n{context_block}\n\n"
+             f"Question: {question}\n"
+             "Answer concisely using the context above."
+         )
+      return {
+            "max_tokens": 2048,
             "temperature": 0.2,
             "messages": [
                 {"role": "system",
@@ -99,10 +77,43 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
                 {"role": "user", "content": user_content}
             ]
         }
+
+adapter = ai.openai.Adapter(
+        auth_key=os.getenv("OPENAI_API_KEY"),
+        model="gpt-4o-mini",
+    )
+
+@inngest_client.create_function(
+    fn_id="RAG: Query PDF",
+    trigger=inngest.TriggerEvent(event="rag/query_pdf_ai"),
+)
+
+async def rag_query_pdf_ai(ctx: inngest.Context):
+    question = ctx.event.data["question"]
+    top_k = int(ctx.event.data.get("top_k", 3))
+
+    found = await ctx.step.run(
+         "embed-and-search",
+         lambda:_search(question=question, top_k=top_k),
+         output_type=RAGSearchResult,
+        )
+    
+    body = build_inference_payload(question=question, contexts=found.contexts)
+    res = await ctx.step.ai.infer(
+        "llm-answer",
+        adapter=adapter,
+        body=body,     
     ) 
 
     answer = res["choices"][0]["message"]["content"].strip()
-    return  {"answer": answer, "num_contexts": len(found.contexts)}
+    result_data = {"answer": answer, "num_contexts": len(found.contexts), "status": "done"}
+    app.state.results[ctx.event.id] = result_data
+    return result_data
+
+@app.get("/api/results/{event_id}")
+async def get_result(event_id:str):
+     return app.state.results.get(event_id, {"status": "pending"})
+     
 
 inngest.fast_api.serve(
     app,

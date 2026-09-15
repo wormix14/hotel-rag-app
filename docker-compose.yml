@@ -27,16 +27,20 @@ services:
     command: npx inngest-cli@latest dev -u http://backend:8000/api/inngest
     ports:
       - "8288:8288"
+    environment:
+      - NODE_OPTIONS=--dns-result-order=ipv4first
     depends_on:
       - backend
 
   streamlit:
     build: .
-    command: streamlit run streamlit.py --server.port 8501 --server.address 0.0.0.0
+    command: streamlit run streamlit.py --server.port 8501 --server.address 0.0.0.0 --server.runOnSave=true
     ports:
       - "8501:8501"
     environment:
       - INNGEST_BASE_URL=http://inngest:8288
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=poll
+      - PYTHONUNBUFFERED=1
     env_file:
       - .env
     volumes:

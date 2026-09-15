@@ -6,57 +6,53 @@ import time
 from dotenv import load_dotenv
 import os
 
-
 load_dotenv()
 
-inngest_base = os.getenv("INNGEST_BASE_URL", "http://127.0.0.1:8288")
-inngest_client = inngest.Inngest(app_id="rag_app", is_production=False,event_api_base_url=inngest_base)
+inngest_base = os.getenv("INNGEST_BASE_URL", "http://inngest:8288")
+backend_base = os.getenv("BACKEND_URL", "http://backend:8000")
+inngest_client = inngest.Inngest(app_id="rag_app", is_production=False, event_api_base_url=inngest_base)
+
+http_session = requests.Session()
 
 def inngest_api_base():
     return f"{inngest_base}/v1"
 
 async def send_event(question: str):
     response = await inngest_client.send(
-    inngest.Event(
-        name="rag/query_pdf_ai",
-        data={
-            "question":question
-        }
+        inngest.Event(
+            name="rag/query_pdf_ai",
+            data={
+                "question": question,
+                "top_k": 3  
+            }
+        )
     )
-)
     return response[0]
 
-def fetch_runs(event_id:str) -> list[dict]:
-    url = f"{inngest_api_base()}/events/{event_id}/runs"
-    response = requests.get(url)
-    response.raise_for_status()
-    data = response.json()  
-    return data.get("data", [])
-
-def wait_for_run_output(event_id: str, timeout_s: float = 120.0, poll_interval_s: float = 0.5) -> dict:
+def wait_for_fastapi_output(event_id: str, pool_interval_s: float = 0.25, timeout:float = 60.0):
+    url=f"{backend_base}/api/results/{event_id}"
     start = time.time()
-    last_status = None
-    while True:
-        runs = fetch_runs(event_id)
-        if runs:
-            run = runs[0]
-            status = run.get("status")
-            last_status = status or last_status
 
+    while True:
+        try:
+            res = http_session.get(url)
+            if res.status_code == 200:
+                data = res.json()
+                if data.get("status") == "done":
+                    return data
+        except requests.RequestException:
+            pass
+
+        if time.time() - start > timeout:
+            raise TimeoutError("Timed out waiting for result from FastAPI")
+
+        time.sleep(pool_interval_s)
             
-            if status in ("Completed", "Succeeded", "Success", "Finished"):
-                return run.get("output") or {}
-            if status in ("Failed", "Cancelled"):
-                raise RuntimeError(f"Function run failed with status: {status}")
-                
-        if time.time() - start > timeout_s:
-            raise TimeoutError(f"Timed out waiting for run output (last status: {last_status})")
-        time.sleep(poll_interval_s)
+        
 
 
 st.title("🤖 AI Concierge RAG")
 
-# Создаем форму для ввода вопроса
 with st.form("rag_form"):
     question = st.text_input("Enter your question:")
     submitted = st.form_submit_button("Ask")
@@ -64,17 +60,20 @@ with st.form("rag_form"):
 if submitted and question.strip():
     with st.spinner("processing your question..."):
         try:
-            # 1. Отправляем событие в Inngest и получаем event_id (через asyncio.run, так как Streamlit синхронный)
+            t0 = time.time()
             event_id = asyncio.run(send_event(question.strip()))
+            t_sent = time.time()
+            st.write(f"⏱ Event sent in: {t_sent - t0:.2f}s")
             
-            # 2. Опрашиваем Inngest до тех пор, пока задача не завершится и не вернет output
-            output = wait_for_run_output(event_id)
+            output =  wait_for_fastapi_output(event_id)
+            t_done = time.time()
             
-            # 3. Достаем нужные поля из ответа воркера
+            st.write(f"⏱ Polling took: {t_done - t_sent:.2f}s")
+            st.write(f"⏱ Total time: {t_done - t0:.2f}s")
+            
             answer = output.get("answer", "Answer not found")
             num_contexts = output.get("num_contexts", 0)
 
-            # 4. Выводим результат на экран
             st.success("Done!")
             st.markdown("### Answer:")
             st.write(answer)

@@ -2,7 +2,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance, PointStruct
 import os 
 
-url = os.getenv("QDRANT_URL", "http://localhost:6333")
+url = os.getenv("QDRANT_URL", "http://qdrant:6333")
 
 class QdrantStorage:
     def __init__(self,url=url,collection: str = ..., dim = 3072):

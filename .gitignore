@@ -11,3 +11,9 @@ __pycache__/
 .pytest_cache/
 
 qdrant_storage/
+check_models.py
+test_rag.py
+
+results.json
+test_questions.json
+
